@@ -44,19 +44,33 @@ def run(bq_client, since_date=None, until_date=None, dry_run=False):
     # Resolve date range
     if since_date is None:
         last_run = get_last_run(bq_client, TABLE)
-        since_date = last_run[:10] if last_run else None  # ISO date only
+        since_date = last_run[:10] if last_run else None
 
-    end = until_date or date.today().isoformat()
     start = since_date or "2000-01-01"
+    end = until_date or date.today().isoformat()
+
+    # Convert cutoff to unix ms for comparison against API's dateCreated field.
+    # The activities endpoint ignores date filter params — it only supports
+    # fetching all records newest-first, so we paginate and stop early.
+    cutoff_ms = int(datetime.strptime(start, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp() * 1000)
+    end_ms = int((datetime.strptime(end, "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1)).timestamp() * 1000)
 
     print(f"  Activities: fetching {start} → {end}")
 
     endpoint = f"/loyalty/shops/{STAMPED_SHOP_ID}/activities"
-    params = {"dateCreated": start, "dateCreatedEnd": end}
-
     all_rows = []
-    for page_records in paginate(endpoint, params=params):
-        all_rows.extend(transform(r) for r in page_records)
+    stopped_early = False
+
+    for page_records in paginate(endpoint, params={}):
+        for r in page_records:
+            ts = int(r.get("dateCreated") or 0)
+            if ts < cutoff_ms:
+                stopped_early = True
+                break
+            if ts < end_ms:
+                all_rows.append(transform(r))
+        if stopped_early:
+            break
 
     print(f"  Fetched {len(all_rows)} activities")
 

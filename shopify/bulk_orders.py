@@ -43,7 +43,7 @@ BULK_INNER_QUERY = """
               discountedUnitPriceSet { shopMoney { amount } }
               totalDiscountSet { shopMoney { amount } }
               product { id productType tags }
-              variant { id }
+              variant { id price compareAtPrice }
             }
           }
         }

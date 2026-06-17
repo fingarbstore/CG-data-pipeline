@@ -16,7 +16,8 @@ def get_last_run(client, table_name):
     rows = list(client.query(query, job_config=job_config).result())
     if not rows:
         return None
-    return rows[0].run_at.isoformat()
+    # Strip microseconds — Shopify's query filter silently rejects them
+    return rows[0].run_at.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def record_run(client, table_name, rows_processed, status, error=None):

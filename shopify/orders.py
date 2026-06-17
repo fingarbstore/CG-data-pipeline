@@ -35,7 +35,7 @@ query GetOrders($cursor: String, $query: String) {
               discountedUnitPriceSet { shopMoney { amount } }
               totalDiscountSet { shopMoney { amount } }
               product { id productType tags }
-              variant { id }
+              variant { id price compareAtPrice }
             }
           }
         }
@@ -50,6 +50,12 @@ def money(obj):
     if not obj:
         return None
     return float(obj.get("shopMoney", {}).get("amount") or 0)
+
+
+def scalar_money(amount):
+    if amount is None:
+        return None
+    return float(amount)
 
 
 def transform_order(node):
@@ -96,20 +102,24 @@ def transform_line_items(order_node):
         item = edge["node"]
         product = item.get("product") or {}
         variant = item.get("variant") or {}
+
         rows.append({
-            "line_item_id":          strip_gid(item.get("id")),
-            "order_id":              order_id,
-            "order_name":            order_name,
-            "customer_id":           customer_id,
-            "created_at":            created_at,
-            "product_id":            strip_gid(product.get("id")),
-            "variant_id":            strip_gid(variant.get("id")),
-            "sku":                   item.get("sku"),
-            "title":                 item.get("title"),
-            "variant_title":         item.get("variantTitle"),
-            "quantity":              int(item.get("quantity") or 0),
-            "original_unit_price":   money(item.get("originalUnitPriceSet")),
-            "discounted_unit_price": money(item.get("discountedUnitPriceSet")),
+            "line_item_id":            strip_gid(item.get("id")),
+            "order_id":                order_id,
+            "order_name":              order_name,
+            "customer_id":             customer_id,
+            "created_at":              created_at,
+            "product_id":              strip_gid(product.get("id")),
+            "variant_id":              strip_gid(variant.get("id")),
+            "sku":                     item.get("sku"),
+            "title":                   item.get("title"),
+            "variant_title":           item.get("variantTitle"),
+            "quantity":                int(item.get("quantity") or 0),
+            # Actual unit price the customer paid at order time (after any line-level discount)
+            "line_price":              money(item.get("discountedUnitPriceSet")),
+            # Current variant price/compare-at — not historical, reflects live catalog state
+            "variant_price":           scalar_money(variant.get("price")),
+            "variant_compare_at_price": scalar_money(variant.get("compareAtPrice")),
             "total_discount":        money(item.get("totalDiscountSet")),
             "product_type":          product.get("productType"),
             "product_tags":          json.dumps(product.get("tags") or []),

@@ -55,6 +55,11 @@ def main():
     results["shopify_inventory"] = n
     if not ok: failures.append("shopify_inventory")
 
+    from shopify.discounts import run as shopify_discounts
+    ok, n = run_step("Shopify discounts (full sync)", shopify_discounts, client)
+    results["shopify_discounts"] = n
+    if not ok: failures.append("shopify_discounts")
+
     # --- Stamped ---
     from stamped.activities import run as stamped_activities
     ok, n = run_step("Stamped activities (incremental)", stamped_activities, client)

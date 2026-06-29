@@ -20,3 +20,6 @@ BQ_DATASET_SHOPIFY = os.getenv("BQ_DATASET_SHOPIFY", "shopify")
 BQ_DATASET_STAMPED = os.getenv("BQ_DATASET_STAMPED", "stamped")
 BQ_DATASET_METADATA = "pipeline_metadata"
 BQ_DATASET_ANALYTICS = "analytics"
+
+# GA4
+GA4_PROPERTY_ID = os.environ["GA4_PROPERTY_ID"]

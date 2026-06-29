@@ -42,4 +42,5 @@ jobs:
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
           BQ_DATASET_SHOPIFY: shopify
           BQ_DATASET_STAMPED: stamped
+          GA4_PROPERTY_ID: ${{ secrets.GA4_PROPERTY_ID }}
         run: python3 -m scripts.daily_update

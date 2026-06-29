@@ -29,49 +29,62 @@ def run(bq_client, since_date=None, dry_run=False):
     print(f"  GA4 landing pages: fetching {since_date} → {end_date}")
 
     ga4_client = BetaAnalyticsDataClient()
-    req = RunReportRequest(
-        property=f"properties/{GA4_PROPERTY_ID}",
-        date_ranges=[DateRange(start_date=since_date, end_date=end_date)],
-        dimensions=[
-            Dimension(name="date"),
-            Dimension(name="landingPage"),
-            Dimension(name="sessionDefaultChannelGroup"),
-            Dimension(name="sessionSource"),
-            Dimension(name="sessionMedium"),
-        ],
-        metrics=[
-            Metric(name="sessions"),
-            Metric(name="newUsers"),
-            Metric(name="totalRevenue"),
-            Metric(name="transactions"),
-        ],
-        limit=100000,
-    )
 
-    resp = ga4_client.run_report(req)
-
+    PAGE_SIZE = 100000
     now = datetime.now(timezone.utc).isoformat()
     rows = []
-    for row in resp.rows:
-        d = row.dimension_values
-        m = row.metric_values
-        date_str = d[0].value  # YYYYMMDD format from GA4
-        date_formatted = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:]}"
-        rows.append({
-            "row_id":        f"{date_formatted}_{d[1].value}_{d[2].value}_{d[3].value}_{d[4].value}",
-            "date":          date_formatted,
-            "landing_page":  d[1].value,
-            "channel_group": d[2].value,
-            "source":        d[3].value,
-            "medium":        d[4].value,
-            "sessions":      int(m[0].value),
-            "new_users":     int(m[1].value),
-            "revenue":       float(m[2].value),
-            "transactions":  int(m[3].value),
-            "ingested_at":   now,
-        })
+    offset = 0
 
-    print(f"  Fetched {len(rows)} rows")
+    while True:
+        req = RunReportRequest(
+            property=f"properties/{GA4_PROPERTY_ID}",
+            date_ranges=[DateRange(start_date=since_date, end_date=end_date)],
+            dimensions=[
+                Dimension(name="date"),
+                Dimension(name="landingPage"),
+                Dimension(name="sessionDefaultChannelGroup"),
+                Dimension(name="sessionSource"),
+                Dimension(name="sessionMedium"),
+            ],
+            metrics=[
+                Metric(name="sessions"),
+                Metric(name="newUsers"),
+                Metric(name="totalRevenue"),
+                Metric(name="transactions"),
+            ],
+            limit=PAGE_SIZE,
+            offset=offset,
+        )
+
+        resp = ga4_client.run_report(req)
+        page_rows = resp.rows
+
+        for row in page_rows:
+            d = row.dimension_values
+            m = row.metric_values
+            date_str = d[0].value
+            date_formatted = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:]}"
+            rows.append({
+                "row_id":        f"{date_formatted}_{d[1].value}_{d[2].value}_{d[3].value}_{d[4].value}",
+                "date":          date_formatted,
+                "landing_page":  d[1].value,
+                "channel_group": d[2].value,
+                "source":        d[3].value,
+                "medium":        d[4].value,
+                "sessions":      int(m[0].value),
+                "new_users":     int(m[1].value),
+                "revenue":       float(m[2].value),
+                "transactions":  int(m[3].value),
+                "ingested_at":   now,
+            })
+
+        print(f"  Page offset {offset}: {len(page_rows)} rows (total so far: {len(rows)})")
+
+        if len(page_rows) < PAGE_SIZE:
+            break
+        offset += PAGE_SIZE
+
+    print(f"  Fetched {len(rows)} rows total")
 
     if dry_run:
         print("  [dry_run] Skipping BQ upsert")

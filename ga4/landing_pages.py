@@ -36,6 +36,8 @@ def run(bq_client, since_date=None, dry_run=False):
             Dimension(name="date"),
             Dimension(name="landingPage"),
             Dimension(name="sessionDefaultChannelGroup"),
+            Dimension(name="sessionSource"),
+            Dimension(name="sessionMedium"),
         ],
         metrics=[
             Metric(name="sessions"),
@@ -56,10 +58,12 @@ def run(bq_client, since_date=None, dry_run=False):
         date_str = d[0].value  # YYYYMMDD format from GA4
         date_formatted = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:]}"
         rows.append({
-            "row_id":        f"{date_formatted}_{d[1].value}_{d[2].value}",
+            "row_id":        f"{date_formatted}_{d[1].value}_{d[2].value}_{d[3].value}_{d[4].value}",
             "date":          date_formatted,
             "landing_page":  d[1].value,
             "channel_group": d[2].value,
+            "source":        d[3].value,
+            "medium":        d[4].value,
             "sessions":      int(m[0].value),
             "new_users":     int(m[1].value),
             "revenue":       float(m[2].value),

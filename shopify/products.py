@@ -15,7 +15,7 @@ query GetProducts($cursor: String) {
     pageInfo { hasNextPage endCursor }
     edges {
       node {
-        id title productType vendor status tags
+        id title handle productType vendor status tags
         createdAt updatedAt publishedAt
         collections(first: 10) {
           edges { node { id title handle } }
@@ -55,6 +55,7 @@ def transform(product_node):
         rows.append({
             "variant_id":          strip_gid(v.get("id")),
             "product_id":          strip_gid(product_node.get("id")),
+            "product_handle":      product_node.get("handle"),
             "product_title":       product_node.get("title"),
             "variant_title":       v.get("title"),
             "sku":                 v.get("sku"),

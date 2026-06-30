@@ -1,7 +1,10 @@
 from datetime import datetime, timezone, date, timedelta
 
 from google.analytics.data_v1beta import BetaAnalyticsDataClient
-from google.analytics.data_v1beta.types import RunReportRequest, DateRange, Dimension, Metric
+from google.analytics.data_v1beta.types import (
+    RunReportRequest, DateRange, Dimension, Metric,
+    FilterExpression, FilterExpressionList, Filter,
+)
 from google.cloud import bigquery
 
 from bigquery.client import get_last_run, record_run
@@ -36,6 +39,32 @@ def run(bq_client, since_date=None, dry_run=False):
     offset = 0
 
     while True:
+        # Exclude Direct sessions from outside the UK — keeps all paid/organic
+        # regardless of country, but filters bot/spam direct traffic
+        uk_filter = FilterExpression(
+            filter=Filter(
+                field_name="country",
+                string_filter=Filter.StringFilter(
+                    match_type=Filter.StringFilter.MatchType.EXACT,
+                    value="United Kingdom",
+                ),
+            )
+        )
+        not_direct = FilterExpression(
+            not_expression=FilterExpression(
+                filter=Filter(
+                    field_name="sessionDefaultChannelGroup",
+                    string_filter=Filter.StringFilter(
+                        match_type=Filter.StringFilter.MatchType.EXACT,
+                        value="Direct",
+                    ),
+                )
+            )
+        )
+        dimension_filter = FilterExpression(
+            or_group=FilterExpressionList(expressions=[not_direct, uk_filter])
+        )
+
         req = RunReportRequest(
             property=f"properties/{GA4_PROPERTY_ID}",
             date_ranges=[DateRange(start_date=since_date, end_date=end_date)],
@@ -52,6 +81,7 @@ def run(bq_client, since_date=None, dry_run=False):
                 Metric(name="totalRevenue"),
                 Metric(name="transactions"),
             ],
+            dimension_filter=dimension_filter,
             limit=PAGE_SIZE,
             offset=offset,
         )

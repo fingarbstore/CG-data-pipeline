@@ -16,7 +16,7 @@ query GetCustomers($cursor: String, $query: String) {
     pageInfo { hasNextPage endCursor }
     edges {
       node {
-        id email firstName lastName phone
+        id email firstName lastName phone state
         createdAt updatedAt numberOfOrders
         amountSpent { amount currencyCode }
         tags note verifiedEmail taxExempt
@@ -58,6 +58,7 @@ def transform(node):
         "default_country":              addr.get("country"),
         "default_zip":                  addr.get("zip"),
         "tags":                         json.dumps(tags),
+        "account_status":               node.get("state"),
         "stamped_vip_tier":             extract_stamped_tier(tags),
         "note":                         node.get("note"),
         "ingested_at":                  datetime.now(timezone.utc).isoformat(),

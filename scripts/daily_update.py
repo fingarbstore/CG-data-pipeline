@@ -65,6 +65,11 @@ def main():
     results["shopify_collections"] = n
     if not ok: failures.append("shopify_collections")
 
+    from shopify.customer_status_snapshot import run as customer_status_snapshot
+    ok, n = run_step("Shopify customer status snapshot", customer_status_snapshot, client)
+    results["customer_status_snapshot"] = n
+    if not ok: failures.append("customer_status_snapshot")
+
     # --- Stamped ---
     from stamped.activities import run as stamped_activities
     ok, n = run_step("Stamped activities (incremental)", stamped_activities, client)

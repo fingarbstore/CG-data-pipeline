@@ -42,10 +42,9 @@ jobs:
       - name: Backfill Meta insights
         env:
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          GA4_PROPERTY_ID: ${{ secrets.GA4_PROPERTY_ID }}
           META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
           META_AD_ACCOUNT_ID: ${{ secrets.META_AD_ACCOUNT_ID }}
-          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-          GA4_PROPERTY_ID: ${{ secrets.GA4_PROPERTY_ID }}
           SHOPIFY_STORE_URL: ${{ secrets.SHOPIFY_STORE_URL }}
           SHOPIFY_ACCESS_TOKEN: ${{ secrets.SHOPIFY_ACCESS_TOKEN }}
           STAMPED_API_KEY: ${{ secrets.STAMPED_API_KEY }}

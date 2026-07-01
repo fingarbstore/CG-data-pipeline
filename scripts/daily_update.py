@@ -86,6 +86,12 @@ def main():
     results["stamped_rewards"] = n
     if not ok: failures.append("stamped_rewards")
 
+    # --- Meta ---
+    from meta.insights import run as meta_insights
+    ok, n = run_step("Meta ad insights (incremental)", meta_insights, client)
+    results["meta_insights"] = n
+    if not ok: failures.append("meta_insights")
+
     # --- Summary ---
     elapsed = (datetime.now(timezone.utc) - start).total_seconds()
     print(f"\n{'='*50}")

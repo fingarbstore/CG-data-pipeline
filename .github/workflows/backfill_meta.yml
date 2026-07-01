@@ -1,16 +1,22 @@
-name: Daily Data Pipeline
+name: Backfill Meta Insights
 
 on:
-  schedule:
-    - cron: '0 2 * * *'  # 02:00 UTC daily
-  workflow_dispatch:       # allow manual runs from GitHub UI
+  workflow_dispatch:
+    inputs:
+      since_date:
+        description: 'Start date (YYYY-MM-DD)'
+        required: true
+        default: '2022-01-01'
+      until_date:
+        description: 'End date (YYYY-MM-DD)'
+        required: false
 
 permissions:
   contents: read
-  id-token: write          # required for Workload Identity Federation
+  id-token: write
 
 jobs:
-  run-pipeline:
+  backfill:
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -33,16 +39,13 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-      - name: Run daily pipeline
+      - name: Backfill Meta insights
         env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+          META_AD_ACCOUNT_ID: ${{ secrets.META_AD_ACCOUNT_ID }}
           SHOPIFY_STORE_URL: ${{ secrets.SHOPIFY_STORE_URL }}
           SHOPIFY_ACCESS_TOKEN: ${{ secrets.SHOPIFY_ACCESS_TOKEN }}
           STAMPED_API_KEY: ${{ secrets.STAMPED_API_KEY }}
           STAMPED_SHOP_ID: ${{ secrets.STAMPED_SHOP_ID }}
-          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-          BQ_DATASET_SHOPIFY: shopify
-          BQ_DATASET_STAMPED: stamped
-          GA4_PROPERTY_ID: ${{ secrets.GA4_PROPERTY_ID }}
-          META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
-          META_AD_ACCOUNT_ID: ${{ secrets.META_AD_ACCOUNT_ID }}
-        run: python3 -m scripts.daily_update
+        run: python3 -m meta.insights ${{ github.event.inputs.since_date }} ${{ github.event.inputs.until_date }}

@@ -1,6 +1,7 @@
 from datetime import datetime, timezone, date, timedelta
 import time
 import requests
+import os
 
 from google.cloud import bigquery
 
@@ -8,16 +9,15 @@ from bigquery.upsert import upsert
 from bigquery.client import get_last_run, record_run
 from config.settings import GCP_PROJECT_ID
 
-import os
-
-AD_ACCOUNT_ID  = os.environ["META_AD_ACCOUNT_ID"]
-ACCESS_TOKEN   = os.environ["META_ACCESS_TOKEN"]
+AD_ACCOUNT_ID = os.environ["META_AD_ACCOUNT_ID"]
+ACCESS_TOKEN  = os.environ["META_ACCESS_TOKEN"]
 
 BQ_DATASET = "meta"
 TABLE      = "meta.ad_insights"
 BQ_TABLE   = "ad_insights"
 
-BASE_URL = "https://graph.facebook.com/v19.0"
+BASE_URL   = "https://graph.facebook.com/v19.0"
+CHUNK_DAYS = 30  # Meta API rejects ranges over ~37 days
 
 FIELDS = [
     "date_start",
@@ -37,19 +37,27 @@ FIELDS = [
     "cpc",
     "ctr",
     "cpp",
-    "objective",
 ]
 
 
-def fetch_insights(since_date, until_date):
+def date_chunks(since_str, until_str):
+    cursor = datetime.strptime(since_str, "%Y-%m-%d").date()
+    end    = datetime.strptime(until_str, "%Y-%m-%d").date()
+    while cursor <= end:
+        chunk_end = min(cursor + timedelta(days=CHUNK_DAYS - 1), end)
+        yield cursor.isoformat(), chunk_end.isoformat()
+        cursor = chunk_end + timedelta(days=1)
+
+
+def fetch_chunk(since_date, until_date):
     url = f"{BASE_URL}/{AD_ACCOUNT_ID}/insights"
     params = {
-        "access_token":  ACCESS_TOKEN,
-        "level":         "ad",
+        "access_token":   ACCESS_TOKEN,
+        "level":          "ad",
         "time_increment": 1,
-        "fields":        ",".join(FIELDS),
-        "time_range":    f'{{"since":"{since_date}","until":"{until_date}"}}',
-        "limit":         500,
+        "fields":         ",".join(FIELDS),
+        "time_range":     f'{{"since":"{since_date}","until":"{until_date}"}}',
+        "limit":          500,
     }
 
     rows = []
@@ -57,18 +65,13 @@ def fetch_insights(since_date, until_date):
         resp = requests.get(url, params=params)
         resp.raise_for_status()
         data = resp.json()
-
-        for r in data.get("data", []):
-            rows.append(r)
-
-        paging = data.get("paging", {})
-        next_url = paging.get("next")
+        rows.extend(data.get("data", []))
+        next_url = data.get("paging", {}).get("next")
         if not next_url:
             break
-        # Follow next page
         url = next_url
         params = {}
-        time.sleep(0.5)
+        time.sleep(0.3)
 
     return rows
 
@@ -86,7 +89,6 @@ def transform(r, now):
         except (TypeError, ValueError):
             return None
 
-    # conversions is a list of action objects
     conversions = sum(
         float(a["value"]) for a in r.get("conversions", [])
         if a.get("action_type") == "offsite_conversion.fb_pixel_purchase"
@@ -97,10 +99,8 @@ def transform(r, now):
         if a.get("action_type") == "offsite_conversion.fb_pixel_purchase"
     ) if r.get("conversion_values") else 0
 
-    row_id = f"{r['date_start']}_{r['ad_id']}"
-
     return {
-        "row_id":        row_id,
+        "row_id":        f"{r['date_start']}_{r['ad_id']}",
         "date":          r["date_start"],
         "campaign_id":   r.get("campaign_id"),
         "campaign_name": r.get("campaign_name"),
@@ -108,7 +108,6 @@ def transform(r, now):
         "adset_name":    r.get("adset_name"),
         "ad_id":         r.get("ad_id"),
         "ad_name":       r.get("ad_name"),
-        "objective":     r.get("objective"),
         "impressions":   safe_int(r.get("impressions")),
         "clicks":        safe_int(r.get("clicks")),
         "reach":         safe_int(r.get("reach")),
@@ -127,30 +126,41 @@ def run(bq_client, since_date=None, until_date=None, dry_run=False):
     if since_date is None:
         last_run = get_last_run(bq_client, TABLE)
         if last_run:
-            since_date = last_run[:10]
+            last_date = datetime.strptime(last_run[:10], "%Y-%m-%d").date()
+            since_date = (last_date + timedelta(days=1)).isoformat()
         else:
             since_date = "2022-01-01"
 
     end = until_date or (date.today() - timedelta(days=1)).isoformat()
 
-    print(f"  Meta insights: fetching {since_date} → {end}")
-
-    raw = fetch_insights(since_date, end)
-    print(f"  Fetched {len(raw)} rows from API")
-
-    if not raw:
+    if since_date > end:
+        print(f"  Meta insights: already up to date ({since_date})")
         record_run(bq_client, TABLE, 0, "success")
         return 0
 
+    print(f"  Meta insights: fetching {since_date} → {end}")
+
     now = datetime.now(timezone.utc).isoformat()
-    rows = [transform(r, now) for r in raw]
+    all_rows = []
+
+    for chunk_start, chunk_end in date_chunks(since_date, end):
+        print(f"    Chunk {chunk_start} → {chunk_end}")
+        raw = fetch_chunk(chunk_start, chunk_end)
+        all_rows.extend(transform(r, now) for r in raw)
+        time.sleep(0.5)
+
+    print(f"  Fetched {len(all_rows)} rows total")
+
+    if not all_rows:
+        record_run(bq_client, TABLE, 0, "success")
+        return 0
 
     if dry_run:
         print("  [dry_run] Skipping BQ upsert")
-        print(f"  Sample: {rows[0]}")
-        return len(rows)
+        print(f"  Sample: {all_rows[0]}")
+        return len(all_rows)
 
-    count = upsert(bq_client, rows, GCP_PROJECT_ID, BQ_DATASET, BQ_TABLE, "row_id")
+    count = upsert(bq_client, all_rows, GCP_PROJECT_ID, BQ_DATASET, BQ_TABLE, "row_id")
     print(f"  Upserted {count} rows")
     record_run(bq_client, TABLE, count, "success")
     return count
@@ -159,7 +169,7 @@ def run(bq_client, since_date=None, until_date=None, dry_run=False):
 if __name__ == "__main__":
     import sys
     client = bigquery.Client(project=GCP_PROJECT_ID)
-    dry = "--dry-run" in sys.argv
+    dry  = "--dry-run" in sys.argv
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     since = args[0] if len(args) > 0 else None
     until = args[1] if len(args) > 1 else None

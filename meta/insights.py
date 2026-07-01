@@ -107,36 +107,42 @@ def transform(r, now):
         except (TypeError, ValueError):
             return None
 
-    conversions = sum(
-        float(a["value"]) for a in r.get("actions", [])
-        if a.get("action_type") == "purchase"
-    )
+    def action_count(action_type):
+        return sum(
+            float(a["value"]) for a in r.get("actions", [])
+            if a.get("action_type") == action_type
+        )
 
-    conv_value = sum(
-        float(a["value"]) for a in r.get("action_values", [])
-        if a.get("action_type") == "purchase"
-    )
+    def action_value(action_type):
+        return sum(
+            float(a["value"]) for a in r.get("action_values", [])
+            if a.get("action_type") == action_type
+        )
 
     return {
-        "row_id":        f"{r['date_start']}_{r['ad_id']}",
-        "date":          r["date_start"],
-        "campaign_id":   r.get("campaign_id"),
-        "campaign_name": r.get("campaign_name"),
-        "adset_id":      r.get("adset_id"),
-        "adset_name":    r.get("adset_name"),
-        "ad_id":         r.get("ad_id"),
-        "ad_name":       r.get("ad_name"),
-        "impressions":   safe_int(r.get("impressions")),
-        "clicks":        safe_int(r.get("clicks")),
-        "reach":         safe_int(r.get("reach")),
-        "spend":         safe_float(r.get("spend")),
-        "frequency":     safe_float(r.get("frequency")),
-        "cpc":           safe_float(r.get("cpc")),
-        "ctr":           safe_float(r.get("ctr")),
-        "cpp":           safe_float(r.get("cpp")),
-        "conversions":   conversions,
-        "conv_value":    conv_value,
-        "ingested_at":   now,
+        "row_id":               f"{r['date_start']}_{r['ad_id']}",
+        "date":                 r["date_start"],
+        "campaign_id":          r.get("campaign_id"),
+        "campaign_name":        r.get("campaign_name"),
+        "adset_id":             r.get("adset_id"),
+        "adset_name":           r.get("adset_name"),
+        "ad_id":                r.get("ad_id"),
+        "ad_name":              r.get("ad_name"),
+        "impressions":          safe_int(r.get("impressions")),
+        "clicks":               safe_int(r.get("clicks")),
+        "reach":                safe_int(r.get("reach")),
+        "spend":                safe_float(r.get("spend")),
+        "frequency":            safe_float(r.get("frequency")),
+        "cpc":                  safe_float(r.get("cpc")),
+        "ctr":                  safe_float(r.get("ctr")),
+        "cpp":                  safe_float(r.get("cpp")),
+        "add_to_cart":          action_count("add_to_cart"),
+        "add_to_cart_value":    action_value("add_to_cart"),
+        "initiate_checkout":    action_count("initiate_checkout"),
+        "checkout_value":       action_value("initiate_checkout"),
+        "conversions":          action_count("purchase"),
+        "conv_value":           action_value("purchase"),
+        "ingested_at":          now,
     }
 
 

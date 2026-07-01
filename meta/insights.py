@@ -52,8 +52,7 @@ def date_chunks(since_str, until_str):
 def fetch_chunk(since_date, until_date):
     url = f"{BASE_URL}/{AD_ACCOUNT_ID}/insights"
 
-    # Use POST with form data to avoid double-encoding of JSON time_range param
-    payload = {
+    params = {
         "access_token":   ACCESS_TOKEN,
         "level":          "ad",
         "time_increment": "1",
@@ -66,7 +65,7 @@ def fetch_chunk(since_date, until_date):
     first = True
     while True:
         if first:
-            resp = requests.post(url, data=payload)
+            resp = requests.get(url, params=params)
             first = False
         else:
             resp = requests.get(next_url)

@@ -61,14 +61,24 @@ def fetch_chunk(since_date, until_date):
         "limit":          "500",
     }
 
+    def get_with_retry(request_url, request_params=None):
+        for attempt in range(5):
+            resp = requests.get(request_url, params=request_params)
+            if resp.status_code < 500:
+                return resp
+            wait = 2 ** attempt * 10
+            print(f"      Meta 5xx (attempt {attempt+1}), retrying in {wait}s...")
+            time.sleep(wait)
+        return resp
+
     rows = []
     first = True
     while True:
         if first:
-            resp = requests.get(url, params=params)
+            resp = get_with_retry(url, params)
             first = False
         else:
-            resp = requests.get(next_url)
+            resp = get_with_retry(next_url)
         resp.raise_for_status()
         data = resp.json()
         rows.extend(data.get("data", []))

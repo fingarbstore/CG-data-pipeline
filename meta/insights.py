@@ -67,11 +67,16 @@ def fetch_chunk(since_date, until_date):
             if resp.status_code == 200:
                 return resp
             body = resp.json().get("error", {})
-            is_transient = body.get("is_transient") or resp.status_code >= 500
+            # Retry on: 5xx, Meta rate limit (code 4), or explicit is_transient flag
+            is_transient = (
+                resp.status_code >= 500
+                or body.get("is_transient")
+                or body.get("code") == 4
+            )
             if not is_transient:
                 return resp
-            wait = 2 ** attempt * 15
-            print(f"      Meta transient error {resp.status_code} (attempt {attempt+1}), retrying in {wait}s...")
+            wait = 2 ** attempt * 30
+            print(f"      Meta error {resp.status_code} code={body.get('code')} (attempt {attempt+1}), retrying in {wait}s...")
             time.sleep(wait)
         return resp
 
@@ -171,7 +176,7 @@ def run(bq_client, since_date=None, until_date=None, dry_run=False):
         print(f"    Chunk {chunk_start} → {chunk_end}")
         raw = fetch_chunk(chunk_start, chunk_end)
         all_rows.extend(transform(r, now) for r in raw)
-        time.sleep(5)
+        time.sleep(30)
 
     print(f"  Fetched {len(all_rows)} rows total")
 

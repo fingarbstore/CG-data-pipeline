@@ -30,8 +30,8 @@ FIELDS = [
     "impressions",
     "clicks",
     "spend",
-    "conversions",
-    "conversion_values",
+    "actions",
+    "action_values",
     "reach",
     "frequency",
     "cpc",
@@ -108,14 +108,14 @@ def transform(r, now):
             return None
 
     conversions = sum(
-        float(a["value"]) for a in r.get("conversions", [])
-        if a.get("action_type") == "offsite_conversion.fb_pixel_purchase"
-    ) if r.get("conversions") else 0
+        float(a["value"]) for a in r.get("actions", [])
+        if a.get("action_type") == "purchase"
+    )
 
     conv_value = sum(
-        float(a["value"]) for a in r.get("conversion_values", [])
-        if a.get("action_type") == "offsite_conversion.fb_pixel_purchase"
-    ) if r.get("conversion_values") else 0
+        float(a["value"]) for a in r.get("action_values", [])
+        if a.get("action_type") == "purchase"
+    )
 
     return {
         "row_id":        f"{r['date_start']}_{r['ad_id']}",

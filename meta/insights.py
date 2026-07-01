@@ -51,26 +51,31 @@ def date_chunks(since_str, until_str):
 
 def fetch_chunk(since_date, until_date):
     url = f"{BASE_URL}/{AD_ACCOUNT_ID}/insights"
-    params = {
+
+    # Use POST with form data to avoid double-encoding of JSON time_range param
+    payload = {
         "access_token":   ACCESS_TOKEN,
         "level":          "ad",
-        "time_increment": 1,
+        "time_increment": "1",
         "fields":         ",".join(FIELDS),
         "time_range":     f'{{"since":"{since_date}","until":"{until_date}"}}',
-        "limit":          500,
+        "limit":          "500",
     }
 
     rows = []
+    first = True
     while True:
-        resp = requests.get(url, params=params)
+        if first:
+            resp = requests.post(url, data=payload)
+            first = False
+        else:
+            resp = requests.get(next_url)
         resp.raise_for_status()
         data = resp.json()
         rows.extend(data.get("data", []))
         next_url = data.get("paging", {}).get("next")
         if not next_url:
             break
-        url = next_url
-        params = {}
         time.sleep(0.3)
 
     return rows

@@ -161,6 +161,6 @@ if __name__ == "__main__":
     client = bigquery.Client(project=GCP_PROJECT_ID)
     dry = "--dry-run" in sys.argv
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    since = args[0] if args else None
-    until = args[1] if args else None
+    since = args[0] if len(args) > 0 else None
+    until = args[1] if len(args) > 1 else None
     run(client, since_date=since, until_date=until, dry_run=dry)

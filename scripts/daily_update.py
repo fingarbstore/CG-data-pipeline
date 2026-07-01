@@ -86,12 +86,6 @@ def main():
     results["stamped_rewards"] = n
     if not ok: failures.append("stamped_rewards")
 
-    # --- GA4 ---
-    from ga4.landing_pages import run as ga4_landing_pages
-    ok, n = run_step("GA4 landing pages (incremental)", ga4_landing_pages, client)
-    results["ga4_landing_pages"] = n
-    if not ok: failures.append("ga4_landing_pages")
-
     # --- Summary ---
     elapsed = (datetime.now(timezone.utc) - start).total_seconds()
     print(f"\n{'='*50}")

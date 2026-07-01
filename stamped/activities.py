@@ -44,7 +44,10 @@ def run(bq_client, since_date=None, until_date=None, dry_run=False):
     # Resolve date range
     if since_date is None:
         last_run = get_last_run(bq_client, TABLE)
-        since_date = last_run[:10] if last_run else None
+        if last_run:
+            # Advance by one day so we don't re-fetch already-loaded records
+            last_date = datetime.strptime(last_run[:10], "%Y-%m-%d").date()
+            since_date = (last_date + timedelta(days=1)).isoformat()
 
     start = since_date or "2000-01-01"
     end = until_date or date.today().isoformat()

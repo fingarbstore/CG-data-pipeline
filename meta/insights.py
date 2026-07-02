@@ -17,7 +17,7 @@ TABLE      = "meta.ad_insights"
 BQ_TABLE   = "ad_insights"
 
 BASE_URL   = "https://graph.facebook.com/v19.0"
-CHUNK_DAYS = 30  # Meta API rejects ranges over ~37 days
+CHUNK_DAYS = 7
 
 FIELDS = [
     "date_start",
@@ -34,6 +34,7 @@ FIELDS = [
     "action_values",
     "reach",
     "frequency",
+    "cpm",
     "cpc",
     "ctr",
     "cpp",
@@ -67,16 +68,8 @@ def fetch_chunk(since_date, until_date):
             if resp.status_code == 200:
                 return resp
             body = resp.json().get("error", {})
-            # Retry on: 5xx, Meta rate limit (code 4), or explicit is_transient flag
-            is_transient = (
-                resp.status_code >= 500
-                or body.get("is_transient")
-                or body.get("code") == 4
-            )
-            if not is_transient:
-                return resp
             wait = 2 ** attempt * 30
-            print(f"      Meta error {resp.status_code} code={body.get('code')} (attempt {attempt+1}), retrying in {wait}s...")
+            print(f"      Meta error {resp.status_code} code={body.get('code')} msg={body.get('message','')!r} (attempt {attempt+1}), retrying in {wait}s...")
             time.sleep(wait)
         return resp
 
@@ -138,9 +131,11 @@ def transform(r, now):
         "reach":                safe_int(r.get("reach")),
         "spend":                safe_float(r.get("spend")),
         "frequency":            safe_float(r.get("frequency")),
+        "cpm":                  safe_float(r.get("cpm")),
         "cpc":                  safe_float(r.get("cpc")),
         "ctr":                  safe_float(r.get("ctr")),
         "cpp":                  safe_float(r.get("cpp")),
+        "result_indicator":     None,
         "add_to_cart":          action_count("add_to_cart"),
         "add_to_cart_value":    action_value("add_to_cart"),
         "initiate_checkout":    action_count("initiate_checkout"),
